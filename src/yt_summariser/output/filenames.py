@@ -43,7 +43,8 @@ def plan_output_path(
     plain = out_dir / f"{base}{suffix}"
     if not plain.exists():
         return OutputPlan(plain)
-    stem = f"{base} [{combo.source} · {combo.provider}-{combo.model}]"
+    label = combo.source if kind == "transcript" else f"{combo.source} · {combo.provider}-{combo.model}"
+    stem = f"{base} [{label}]"
     if (out_dir / f"{stem}{suffix}").exists():
         stem = f"{stem} ({combo.video_id})"
     return OutputPlan(out_dir / f"{stem}{suffix}")

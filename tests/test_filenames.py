@@ -98,3 +98,13 @@ def test_transcript_files_use_their_own_suffix_and_do_not_clash_with_summaries(t
 
     assert plan.path == tmp_path / "How Rust Works.transcript.md"
     assert not plan.skipped
+
+
+def test_transcripts_are_told_apart_by_source_alone(tmp_path):
+    first = Combination("abc123", "manual", "none", "none")
+    second = Combination("abc123", "whisper", "none", "none")
+    write_note(tmp_path / "How Rust Works.transcript.md", first)
+
+    plan = plan_output_path(tmp_path, "How Rust Works", second, kind="transcript")
+
+    assert plan.path == tmp_path / "How Rust Works [whisper].transcript.md"

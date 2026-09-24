@@ -17,8 +17,10 @@ class FakeYouTube:
     def __init__(self, manual=None, auto=None):
         self._captions = {"manual": manual, "auto": auto}
         self.audio_downloaded = False
+        self.info_calls = 0
 
     def info(self, url):
+        self.info_calls += 1
         return INFO
 
     def captions(self, url, kind):
