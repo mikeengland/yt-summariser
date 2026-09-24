@@ -39,8 +39,8 @@ def tracks(url, *languages):
     return {lang: [{"ext": "vtt", "url": "unused"}, {"ext": "json3", "url": url}] for lang in languages}
 
 
-def adapter_for(data):
-    return YtDlpYouTube(extract=lambda url: data)
+def adapter_for(data, sleep=lambda seconds: None):
+    return YtDlpYouTube(extract=lambda url: data, sleep=sleep)
 
 
 def test_info_maps_extracted_metadata():
@@ -132,3 +132,65 @@ def test_whisper_adapter_returns_trimmed_non_empty_segments():
     transcriber = FasterWhisperTranscriber(model=FakeWhisperModel())
 
     assert transcriber.transcribe("audio.m4a") == [Segment(0.0, "Hello"), Segment(4.0, "world")]
+
+
+def json3_track(url):
+    return [{"ext": "json3", "url": url}]
+
+
+def test_original_language_track_is_preferred_over_a_machine_translation():
+    with FakeServer([(200, JSON3)]) as server:
+        auto = {
+            "en": json3_track(f"{server.url}/translated.json3?lang=ar&tlang=en"),
+            "en-orig": json3_track(f"{server.url}/original.json3?lang=en"),
+        }
+
+        segments = adapter_for(extracted(automatic_captions=auto)).captions(URL, "auto")
+
+    assert segments is not None
+    assert [r["path"] for r in server.requests] == ["/original.json3?lang=en"]
+
+
+def test_a_real_track_in_the_videos_language_beats_an_english_translation():
+    with FakeServer([(200, JSON3)]) as server:
+        auto = {
+            "en": json3_track(f"{server.url}/translated.json3?lang=ar&tlang=en"),
+            "ar": json3_track(f"{server.url}/arabic.json3?lang=ar"),
+        }
+
+        adapter_for(extracted(automatic_captions=auto, language="ar")).captions(URL, "auto")
+
+    assert [r["path"] for r in server.requests] == ["/arabic.json3?lang=ar"]
+
+
+def test_translation_is_used_only_when_nothing_else_exists():
+    with FakeServer([(200, JSON3)]) as server:
+        auto = {"en": json3_track(f"{server.url}/translated.json3?lang=ar&tlang=en")}
+
+        segments = adapter_for(extracted(automatic_captions=auto, language="ar")).captions(URL, "auto")
+
+    assert segments is not None
+
+
+def test_rate_limited_caption_download_is_retried_with_backoff():
+    sleeps = []
+    with FakeServer([(429, {}), (429, {}), (200, JSON3)]) as server:
+        data = extracted(subtitles=tracks(server.url + "/en.json3", "en"))
+
+        segments = adapter_for(data, sleep=sleeps.append).captions(URL, "manual")
+
+    assert segments == [Segment(1.5, "Hello world"), Segment(65.0, "second line")]
+    assert sleeps == [1, 2]
+
+
+def test_persistent_rate_limiting_is_a_one_line_actionable_error():
+    with FakeServer([(429, {})] * 4) as server:
+        data = extracted(subtitles=tracks(server.url + "/en.json3", "en"))
+
+        with pytest.raises(TranscriptError) as error:
+            adapter_for(data).captions(URL, "manual")
+
+    assert str(error.value) == (
+        "YouTube is rate-limiting caption downloads (HTTP 429). "
+        "Wait a few minutes and retry, or use --source whisper."
+    )

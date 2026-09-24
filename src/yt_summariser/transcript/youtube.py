@@ -1,5 +1,6 @@
 import re
 import tempfile
+import time
 from pathlib import Path
 
 import httpx
@@ -10,9 +11,13 @@ from yt_summariser.transcript.models import Segment, VideoInfo
 from yt_summariser.transcript.selection import TranscriptError
 
 
+CAPTION_RETRIES = 3
+
+
 class YtDlpYouTube:
-    def __init__(self, cookies_from_browser: str | None = None, extract=None):
+    def __init__(self, cookies_from_browser: str | None = None, extract=None, sleep=time.sleep):
         self.cookies_from_browser = cookies_from_browser
+        self._sleep = sleep
         self._extract_url = extract or self._extract_with_yt_dlp
         self._extracted: dict[str, dict] = {}
 
@@ -56,12 +61,28 @@ class YtDlpYouTube:
         language = _pick_language(tracks, data.get("language"))
         if language is None:
             return None
-        fmt = next((f for f in tracks[language] if f.get("ext") == "json3"), None)
+        fmt = _json3_format(tracks[language])
         if fmt is None:
             return None
-        response = httpx.get(fmt["url"], timeout=60, follow_redirects=True)
-        response.raise_for_status()
-        return parse_json3(response.json())
+        return parse_json3(self._download_json(fmt["url"]))
+
+    def _download_json(self, url: str) -> dict:
+        for attempt in range(CAPTION_RETRIES + 1):
+            try:
+                response = httpx.get(url, timeout=60, follow_redirects=True)
+            except httpx.HTTPError as error:
+                raise TranscriptError(f"Could not download captions: {error}") from error
+            if response.status_code == 429:
+                if attempt < CAPTION_RETRIES:
+                    self._sleep(2**attempt)
+                    continue
+                raise TranscriptError(
+                    "YouTube is rate-limiting caption downloads (HTTP 429). "
+                    "Wait a few minutes and retry, or use --source whisper."
+                )
+            if response.status_code >= 400:
+                raise TranscriptError(f"Could not download captions: HTTP {response.status_code}")
+            return response.json()
 
     def audio(self, url: str) -> Path:
         directory = Path(tempfile.mkdtemp(prefix="yt-summariser-"))
@@ -74,12 +95,30 @@ class YtDlpYouTube:
         return next(directory.iterdir())
 
 
+def _json3_format(formats: list[dict]) -> dict | None:
+    return next((f for f in formats if f.get("ext") == "json3"), None)
+
+
+def _is_translation(formats: list[dict]) -> bool:
+    fmt = _json3_format(formats)
+    return bool(fmt and "tlang=" in fmt["url"])
+
+
 def _pick_language(tracks: dict, original: str | None) -> str | None:
-    english = sorted(lang for lang in tracks if lang == "en" or lang.startswith("en-"))
+    """Prefer real English, then the video's own language; machine translations come last.
+
+    YouTube serves auto-translated tracks (``tlang=``) with aggressive rate limiting, and they
+    are worse than the original speech recognition anyway.
+    """
+    real = {lang for lang, formats in tracks.items() if not _is_translation(formats)}
+    english = sorted(lang for lang in real if lang == "en" or lang.startswith("en-"))
     if english:
         return "en" if "en" in english else english[0]
-    if original and original in tracks:
+    if original and original in real:
         return original
+    translated = sorted(lang for lang in tracks if lang == "en" or lang.startswith("en-"))
+    if translated:
+        return "en" if "en" in translated else translated[0]
     return None
 
 
