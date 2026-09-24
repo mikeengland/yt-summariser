@@ -1,7 +1,7 @@
 [project]
 name = "yt-summariser"
 version = "0.1.0"
-description = "Add your description here"
+description = "Downloads, transcribes and summarises key points from YouTube videos"
 readme = "README.md"
 authors = [
     { name = "mike", email = "mikeengland@users.noreply.github.com" }
@@ -9,10 +9,18 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "httpx>=0.28.1",
+    "platformdirs>=4.11.12",
+    "yt-dlp>=2026.8.19",
 ]
 
 [project.scripts]
-yt-summariser = "yt_summariser:main"
+yt-summariser = "yt_summariser.cli:main"
+yts = "yt_summariser.cli:main"
+
+[project.optional-dependencies]
+whisper = [
+    "faster-whisper>=1.2.1",
+]
 
 [build-system]
 requires = ["uv_build>=0.12.18,<0.13.0"]

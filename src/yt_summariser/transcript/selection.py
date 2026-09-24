@@ -15,8 +15,7 @@ def get_transcript(url, source, youtube, whisper) -> Transcript:
         if source == "captions":
             raise TranscriptError("No captions found for this video")
     if whisper is None:
-        raise TranscriptError(
-            "No captions found; install with uv tool install 'yt-summariser[whisper]'."
-        )
+        reason = "Whisper is not installed" if source == "whisper" else "No captions found"
+        raise TranscriptError(f"{reason}; install with uv tool install 'yt-summariser[whisper]'.")
     audio = youtube.audio(url)
     return Transcript("whisper", whisper.transcribe(audio), info)

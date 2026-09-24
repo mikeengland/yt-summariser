@@ -63,3 +63,14 @@ def test_missing_whisper_extra_gives_an_actionable_error():
         "No captions found; install with uv tool install 'yt-summariser[whisper]'."
     )
     assert not youtube.audio_downloaded
+
+
+def test_forced_whisper_without_the_extra_does_not_blame_missing_captions():
+    youtube = FakeYouTube(manual=MANUAL)
+
+    with pytest.raises(TranscriptError) as error:
+        get_transcript(INFO.url, "whisper", youtube, whisper=None)
+
+    assert str(error.value) == (
+        "Whisper is not installed; install with uv tool install 'yt-summariser[whisper]'."
+    )

@@ -229,3 +229,21 @@ def test_different_sources_are_cached_separately(tmp_path):
         invoke([INFO.url, "-o", str(out), "--source", "whisper"], server.url, youtube=youtube, cache_dir=cache)
 
     assert youtube.info_calls == 2
+
+
+def test_summary_language_defaults_to_english_and_can_be_overridden(tmp_path):
+    with FakeServer([(200, GOOD_REPLY), (200, GOOD_REPLY)]) as server:
+        invoke([INFO.url, "-o", str(tmp_path / "a")], server.url, cache_dir=tmp_path / "c")
+        invoke([INFO.url, "-o", str(tmp_path / "b"), "--language", "French"], server.url, cache_dir=tmp_path / "c")
+
+    system_prompts = [r["body"]["messages"][0]["content"] for r in server.requests]
+    assert "Write the summary in English." in system_prompts[0]
+    assert "Write the summary in French." in system_prompts[1]
+
+
+def test_provider_is_required_for_summaries(tmp_path):
+    code, _, stderr = invoke([INFO.url, "-o", str(tmp_path / "v")], cache_dir=tmp_path / "c")
+
+    assert code == 2
+    assert "--provider is required" in stderr
+    assert "claude, openai or ollama" in stderr

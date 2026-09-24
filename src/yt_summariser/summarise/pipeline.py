@@ -10,16 +10,17 @@ from yt_summariser.summarise.prompts import (
 ATTEMPTS = 2
 
 
-def summarise(segments, provider, budget_tokens: int) -> Summary:
+def summarise(segments, provider, budget_tokens: int, language: str = "English") -> Summary:
+    instruction = f"\n\nWrite the summary in {language}."
     transcript_text = format_transcript(segments)
     if estimate_tokens(transcript_text) <= budget_tokens:
-        system, user = SYSTEM_PROMPT, transcript_text
+        system, user = SYSTEM_PROMPT + instruction, transcript_text
     else:
         notes = [
             provider.complete(CHUNK_SYSTEM_PROMPT, format_transcript(chunk))
             for chunk in plan_chunks(segments, budget_tokens)
         ]
-        system, user = MERGE_SYSTEM_PROMPT, "\n\n".join(notes)
+        system, user = MERGE_SYSTEM_PROMPT + instruction, "\n\n".join(notes)
     for _ in range(ATTEMPTS):
         summary = parse_summary(provider.complete(system, user))
         if summary.complete:

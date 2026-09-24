@@ -1,6 +1,7 @@
 import re
 
 _CITATION = re.compile(r" ?\[(?:(\d+):)?(\d+):(\d{2})\]")
+_PLACEHOLDER = re.compile(r" ?\[(?:h:)?mm:ss\]", re.I)
 
 
 def link_timestamps(markdown: str, video_id: str, duration: int) -> str:
@@ -11,4 +12,4 @@ def link_timestamps(markdown: str, video_id: str, duration: int) -> str:
             return ""
         return f"{match.group(0)}(https://youtu.be/{video_id}?t={total})"
 
-    return _CITATION.sub(replace, markdown)
+    return _CITATION.sub(replace, _PLACEHOLDER.sub("", markdown))
