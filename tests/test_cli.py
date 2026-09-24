@@ -61,7 +61,7 @@ def test_summarises_a_video_into_a_titled_markdown_file(tmp_path):
 def test_missing_out_dir_is_a_clear_usage_error(tmp_path):
     code, stdout, stderr = invoke([INFO.url, "--provider", "ollama", "--model", "m"])
 
-    assert code == 2
+    assert code == 1
     assert stdout == ""
     assert "--out-dir" in stderr
 
@@ -244,6 +244,6 @@ def test_summary_language_defaults_to_english_and_can_be_overridden(tmp_path):
 def test_provider_is_required_for_summaries(tmp_path):
     code, _, stderr = invoke([INFO.url, "-o", str(tmp_path / "v")], cache_dir=tmp_path / "c")
 
-    assert code == 2
+    assert code == 1
     assert "--provider is required" in stderr
     assert "claude, openai or ollama" in stderr

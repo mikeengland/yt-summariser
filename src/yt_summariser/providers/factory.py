@@ -5,7 +5,7 @@ from yt_summariser.providers.http import ProviderError
 from yt_summariser.providers.openai_compatible import OpenAICompatibleProvider
 
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-5"
-DEFAULT_OPENAI_MODEL = "gpt-5"
+DEFAULT_OPENAI_MODEL = "gpt-6-luna"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 

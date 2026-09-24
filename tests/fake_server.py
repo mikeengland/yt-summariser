@@ -12,6 +12,9 @@ class FakeServer:
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.do_POST()
+
             def do_POST(self):
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")

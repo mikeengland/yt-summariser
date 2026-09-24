@@ -11,8 +11,9 @@ from yt_summariser.transcript.selection import TranscriptError
 
 
 class YtDlpYouTube:
-    def __init__(self, cookies_from_browser: str | None = None):
+    def __init__(self, cookies_from_browser: str | None = None, extract=None):
         self.cookies_from_browser = cookies_from_browser
+        self._extract_url = extract or self._extract_with_yt_dlp
         self._extracted: dict[str, dict] = {}
 
     def _options(self, **extra) -> dict:
@@ -21,15 +22,18 @@ class YtDlpYouTube:
             options["cookiesfrombrowser"] = (self.cookies_from_browser,)
         return options
 
+    def _extract_with_yt_dlp(self, url: str) -> dict:
+        with yt_dlp.YoutubeDL(self._options()) as ydl:
+            return ydl.extract_info(url, download=False)
+
     def _extract(self, url: str) -> dict:
         if url not in self._extracted:
             try:
-                with yt_dlp.YoutubeDL(self._options()) as ydl:
-                    self._extracted[url] = ydl.extract_info(url, download=False)
+                self._extracted[url] = self._extract_url(url)
             except DownloadError as error:
-                reason = re.sub(r"^ERROR:\s*(\[[^\]]*\]\s*)?", "", str(error)).strip()
+                reason = re.sub(r"^ERROR:\s*(?:\[[^\]]*\][^:]*:\s*)?", "", str(error)).strip()
                 raise TranscriptError(
-                    f"{reason} If the video is restricted, try --cookies-from-browser <browser>."
+                    f"{reason.rstrip('.')}. If the video is restricted, try --cookies-from-browser <browser>."
                 ) from error
         return self._extracted[url]
 

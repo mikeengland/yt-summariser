@@ -37,7 +37,7 @@ class _Parser(argparse.ArgumentParser):
 EPILOG = """\
 providers (choose one with --provider; there is no default):
   claude   needs ANTHROPIC_API_KEY. Default model: claude-sonnet-5.
-  openai   needs OPENAI_API_KEY. Default model: gpt-5. Set OPENAI_BASE_URL (or --base-url)
+  openai   needs OPENAI_API_KEY. Default model: gpt-6-luna. Set OPENAI_BASE_URL (or --base-url)
            to use any OpenAI-compatible server.
   ollama   needs no key, but --model is required (e.g. --model llama3). Endpoint is
            http://localhost:11434/v1; override with OLLAMA_HOST or --base-url.
@@ -93,11 +93,11 @@ def run(argv, env, youtube, whisper, stdout, stderr, cache_dir=None) -> int:
     try:
         args = build_parser().parse_args(argv)
     except UsageError as error:
-        print(f"usage error: {error}", file=stderr)
-        return 2
+        print(f"error: {error}", file=stderr)
+        return 1
     if not args.transcript_only and not args.provider:
-        print("usage error: --provider is required (claude, openai or ollama).", file=stderr)
-        return 2
+        print("error: --provider is required (claude, openai or ollama).", file=stderr)
+        return 1
     try:
         return _run(args, env, youtube, whisper, stdout, stderr, cache_dir)
     except (ProviderError, TranscriptError, ToolError) as error:

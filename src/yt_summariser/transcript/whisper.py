@@ -6,9 +6,9 @@ WHISPER_MODEL = "small"
 
 
 class FasterWhisperTranscriber:
-    def __init__(self, model_size: str = WHISPER_MODEL):
+    def __init__(self, model_size: str = WHISPER_MODEL, model=None):
         self.model_size = model_size
-        self._model = None
+        self._model = model
 
     def transcribe(self, audio_path: Path) -> list[Segment]:
         if self._model is None:

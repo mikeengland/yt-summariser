@@ -54,3 +54,9 @@ def test_ollama_base_url_prefers_flag_over_environment():
 
     assert from_env.base_url == "http://gpu-box:11434/v1"
     assert from_flag.base_url == "http://other:1234/v1"
+
+
+def test_openai_uses_documented_default_model():
+    provider = make_provider("openai", model=None, env={"OPENAI_API_KEY": "k"})
+
+    assert provider.model == "gpt-6-luna"

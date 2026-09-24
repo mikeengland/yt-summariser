@@ -22,7 +22,7 @@ error: --provider claude needs ANTHROPIC_API_KEY to be set. Export it first, e.g
 ## openai
 
 - Environment: `OPENAI_API_KEY` (required), `OPENAI_BASE_URL` (optional)
-- Model: `--model`, default `gpt-5` (check this is a model your account can use)
+- Model: `--model`, default `gpt-6-luna`
 - Any OpenAI-compatible server works via `OPENAI_BASE_URL` or `--base-url`.
 
 ```console
