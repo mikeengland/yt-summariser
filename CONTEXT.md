@@ -29,8 +29,12 @@ One bullet in a Summary, linked to the moment in the Video it comes from.
 _Avoid_: Highlight, takeaway
 
 **Combination**:
-The (Video, Transcript source, Provider, model) tuple that identifies one Summary. Two runs with the same Combination are duplicates.
+The (Video, Transcript source, Provider, model, Detail level) tuple that identifies one Summary. Two runs with the same Combination are duplicates.
 _Avoid_: Variant, run
+
+**Detail level**:
+How thorough a Summary is: `brief`, `standard` or `detailed`, which sets the TL;DR length and number of Key points. Chosen from the Video's length unless given.
+_Avoid_: Verbosity, depth, mode
 
 **Vault**:
 The output directory the user points the tool at, typically an Obsidian folder.

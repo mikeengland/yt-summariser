@@ -1,3 +1,5 @@
+import dataclasses
+
 from yt_summariser.output.filenames import Combination, plan_output_path
 
 COMBO = Combination(video_id="abc123", source="manual", provider="claude", model="sonnet")
@@ -108,3 +110,14 @@ def test_transcripts_are_told_apart_by_source_alone(tmp_path):
     plan = plan_output_path(tmp_path, "How Rust Works", second, kind="transcript")
 
     assert plan.path == tmp_path / "How Rust Works [whisper].transcript.md"
+
+
+def test_notes_without_a_detail_field_count_as_standard(tmp_path):
+    existing = tmp_path / "How Rust Works.md"
+    write_note(existing, COMBO)
+
+    plan = plan_output_path(tmp_path, "How Rust Works", COMBO)
+    other = plan_output_path(tmp_path, "How Rust Works", dataclasses.replace(COMBO, detail="brief"))
+
+    assert plan.skipped
+    assert other.path == tmp_path / "How Rust Works [manual · claude-sonnet · brief].md"

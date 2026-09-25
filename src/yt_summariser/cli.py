@@ -10,7 +10,7 @@ from yt_summariser.output.render import render_note
 from yt_summariser.providers.factory import make_provider
 from yt_summariser.providers.http import ProviderError
 from yt_summariser.summarise.pipeline import summarise
-from yt_summariser.summarise.prompts import format_transcript
+from yt_summariser.summarise.prompts import DETAIL_LEVELS, detail_for_duration, format_transcript
 from yt_summariser.summarise.timestamps import link_timestamps
 from yt_summariser.transcript.cache import TranscriptCache, parse_video_id
 from yt_summariser.transcript.whisper import load_whisper
@@ -43,11 +43,18 @@ providers (choose one with --provider; there is no default):
            http://localhost:11434/v1; override with OLLAMA_HOST or --base-url.
            Assumes a 16k context window (start Ollama with OLLAMA_CONTEXT_LENGTH=16384);
            for its default 4096 window pass --max-context-tokens 2500.
+           Small local models may truncate --detail detailed; try standard if they do.
+
+detail levels (--detail; by default chosen from the video's length):
+  brief      1-sentence TL;DR and 3-5 key points (default under 10 minutes)
+  standard   2-3 sentence TL;DR and 5-10 key points (default under an hour)
+  detailed   paragraph TL;DR and 10-20 key points (default for an hour or more)
 
 examples:
   yts URL -o ~/Vault/YouTube --provider claude
   yts URL -o ~/Vault/YouTube --provider ollama --model llama3
   yts URL -o ~/Vault/YouTube --transcript-only --source captions
+  yts URL --provider claude --detail brief          # print a quick summary to stdout
 """
 
 
@@ -60,8 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("url", help="YouTube video URL")
     parser.add_argument(
-        "-o", "--out-dir", required=True, type=Path,
-        help="directory to write the note into (created if missing)",
+        "-o", "--out-dir", type=Path,
+        help="directory to write the note into (created if missing); if omitted, print the note to stdout",
     )
     parser.add_argument(
         "--provider", choices=["claude", "openai", "ollama"],
@@ -79,6 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--force", action="store_true", help="overwrite an existing identical note")
     parser.add_argument("--no-cache", action="store_true", help="ignore cached transcripts")
+    parser.add_argument(
+        "--detail", choices=DETAIL_LEVELS,
+        help="how thorough the summary is (default: chosen from the video's length)",
+    )
     parser.add_argument("--language", default="English", help="language of the summary (default: English)")
     parser.add_argument(
         "--max-context-tokens", type=int,
@@ -115,22 +126,24 @@ def _run(args, env, youtube, whisper, stdout, stderr, cache_dir) -> int:
     if args.transcript_only:
         return _write_transcript(args, transcript, stdout, stderr)
     provider = make_provider(args.provider, args.model, env, args.base_url)
-    combo = Combination(info.video_id, transcript.source, args.provider, provider.model)
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    plan = plan_output_path(args.out_dir, info.title, combo, force=args.force)
-    if plan.skipped:
-        print(f"skipping: already summarised in {plan.path} (use --force to overwrite)", file=stderr)
-        return 0
+    detail = args.detail or detail_for_duration(info.duration)
+    plan = None
+    if args.out_dir:
+        combo = Combination(info.video_id, transcript.source, args.provider, provider.model, detail)
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        plan = plan_output_path(args.out_dir, info.title, combo, force=args.force)
+        if plan.skipped:
+            print(f"skipping: already summarised in {plan.path} (use --force to overwrite)", file=stderr)
+            return 0
     budget = args.max_context_tokens or DEFAULT_CONTEXT_BUDGET[args.provider]
-    summary = summarise(transcript.segments, provider, budget, args.language)
+    summary = summarise(transcript.segments, provider, budget, args.language, detail)
     if not summary.usable:
         raise ToolError("The model returned no usable summary. Try again or use a different --model.")
     if not summary.complete:
         print(f"warning: the model's summary is missing its {' and '.join(summary.missing())}", file=stderr)
     body = link_timestamps(summary.to_markdown(), info.video_id, info.duration)
-    plan.path.write_text(render_note(info, transcript.source, args.provider, provider.model, body))
-    print(plan.path, file=stdout)
-    return 0
+    note = render_note(info, transcript.source, args.provider, provider.model, body, detail)
+    return _emit(plan, note, stdout)
 
 
 def _load_transcript(args, youtube, whisper, cache_dir):
@@ -146,15 +159,24 @@ def _load_transcript(args, youtube, whisper, cache_dir):
 
 def _write_transcript(args, transcript, stdout, stderr) -> int:
     info = transcript.info
-    combo = Combination(info.video_id, transcript.source, "none", "none")
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    plan = plan_output_path(args.out_dir, info.title, combo, force=args.force, kind="transcript")
-    if plan.skipped:
-        print(f"skipping: already saved in {plan.path} (use --force to overwrite)", file=stderr)
-        return 0
+    plan = None
+    if args.out_dir:
+        combo = Combination(info.video_id, transcript.source, "none", "none")
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        plan = plan_output_path(args.out_dir, info.title, combo, force=args.force, kind="transcript")
+        if plan.skipped:
+            print(f"skipping: already saved in {plan.path} (use --force to overwrite)", file=stderr)
+            return 0
     body = format_transcript(transcript.segments)
-    plan.path.write_text(render_note(info, transcript.source, "none", "none", body))
-    print(plan.path, file=stdout)
+    return _emit(plan, render_note(info, transcript.source, "none", "none", body), stdout)
+
+
+def _emit(plan, note, stdout) -> int:
+    if plan is None:
+        stdout.write(note if note.endswith("\n") else note + "\n")
+    else:
+        plan.path.write_text(note)
+        print(plan.path, file=stdout)
     return 0
 
 

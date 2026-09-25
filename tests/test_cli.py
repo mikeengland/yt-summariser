@@ -1,3 +1,4 @@
+import dataclasses
 import io
 
 from fake_server import FakeServer
@@ -58,12 +59,23 @@ def test_summarises_a_video_into_a_titled_markdown_file(tmp_path):
     assert "- No garbage collector [02:05](https://youtu.be/abc123?t=125)" in text
 
 
-def test_missing_out_dir_is_a_clear_usage_error(tmp_path):
-    code, stdout, stderr = invoke([INFO.url, "--provider", "ollama", "--model", "m"])
+def test_without_out_dir_the_note_is_printed_to_stdout_and_nothing_is_written(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    with FakeServer([(200, GOOD_REPLY)]) as server:
+        code, stdout, _ = invoke([INFO.url], server.url)
 
-    assert code == 1
-    assert stdout == ""
-    assert "--out-dir" in stderr
+    assert code == 0
+    assert stdout.startswith("---\n")
+    assert "# How Rust Works" in stdout
+    assert "Rust is fast and safe." in stdout
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_transcript_only_without_out_dir_prints_to_stdout():
+    code, stdout, _ = invoke([INFO.url, "--transcript-only"])
+
+    assert code == 0
+    assert stdout.startswith("---\n")
 
 
 def test_missing_api_key_fails_with_one_actionable_line_and_no_file(tmp_path):
@@ -239,6 +251,53 @@ def test_summary_language_defaults_to_english_and_can_be_overridden(tmp_path):
     system_prompts = [r["body"]["messages"][0]["content"] for r in server.requests]
     assert "Write the summary in English." in system_prompts[0]
     assert "Write the summary in French." in system_prompts[1]
+
+
+class LongYouTube(FakeYouTube):
+    def __init__(self, duration):
+        super().__init__(manual=MANUAL)
+        self.duration = duration
+
+    def info(self, url):
+        super().info(url)
+        return dataclasses.replace(INFO, duration=self.duration)
+
+
+def system_prompt_for(tmp_path, argv, youtube=None):
+    with FakeServer([(200, GOOD_REPLY)]) as server:
+        invoke(argv, server.url, youtube=youtube, cache_dir=tmp_path / "c")
+    return server.requests[0]["body"]["messages"][0]["content"]
+
+
+def test_detail_defaults_from_video_length(tmp_path):
+    short = system_prompt_for(tmp_path / "s", [INFO.url], LongYouTube(5 * 60))
+    medium = system_prompt_for(tmp_path / "m", [INFO.url], LongYouTube(30 * 60))
+    long = system_prompt_for(tmp_path / "l", [INFO.url], LongYouTube(2 * 60 * 60))
+
+    assert "Give 3-5 key points" in short
+    assert "Give 5-10 key points" in medium
+    assert "Give 10-20 key points" in long
+
+
+def test_detail_flag_overrides_the_length_default(tmp_path):
+    prompt = system_prompt_for(tmp_path, [INFO.url, "--detail", "detailed"])
+
+    assert "Give 10-20 key points" in prompt
+
+
+def test_detail_is_recorded_and_a_different_level_is_written_alongside(tmp_path):
+    out = tmp_path / "vault"
+    with FakeServer([(200, GOOD_REPLY), (200, GOOD_REPLY)]) as server:
+        invoke([INFO.url, "-o", str(out)], server.url, cache_dir=tmp_path / "c")
+        code, stdout, _ = invoke(
+            [INFO.url, "-o", str(out), "--detail", "brief"], server.url, cache_dir=tmp_path / "c"
+        )
+
+    brief = out / "How Rust Works [manual · ollama-m · brief].md"
+    assert code == 0
+    assert "detail: standard" in (out / "How Rust Works.md").read_text()
+    assert "detail: brief" in brief.read_text()
+    assert stdout.strip() == str(brief)
 
 
 def test_provider_is_required_for_summaries(tmp_path):

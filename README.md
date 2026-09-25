@@ -21,12 +21,12 @@ The command is available as `yts` and `yt-summariser`. Run `yts --help` for all 
 
 ## Usage
 
-`-o/--out-dir` is required (created if missing) and so is `--provider`. See
+`--provider` is required. Without `-o/--out-dir` the note is printed to stdout; with it, the note is written there (created if missing) and its path is printed. See
 [docs/providers.md](docs/providers.md) for each provider's environment variables and errors.
 
 | Flag | Meaning |
 | --- | --- |
-| `-o, --out-dir DIR` | Where to write the note. **Required.** |
+| `-o, --out-dir DIR` | Where to write the note. Omit to print it to stdout. |
 | `--provider claude\|openai\|ollama` | Who writes the summary. **Required** (except with `--transcript-only`). |
 | `--model NAME` | Model to use. Defaulted for claude/openai, required for ollama. |
 | `--base-url URL` | Override the provider's API endpoint. |
@@ -34,6 +34,7 @@ The command is available as `yts` and `yt-summariser`. Run `yts --help` for all 
 | `--transcript-only` | Write `<title>.transcript.md` and skip the LLM. |
 | `--force` | Overwrite an identical existing note. |
 | `--no-cache` | Ignore cached transcripts. |
+| `--detail brief\|standard\|detailed` | How thorough the summary is: 3-5, 5-10 or 10-20 key points. Defaults from length: brief under 10 min, standard under an hour, detailed beyond. |
 | `--language LANG` | Language of the summary (default English). |
 | `--max-context-tokens N` | Chunk transcripts longer than this before summarising. |
 | `--cookies-from-browser B` | Pass browser cookies to yt-dlp for restricted videos. |

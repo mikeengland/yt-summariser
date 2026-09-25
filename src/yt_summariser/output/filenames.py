@@ -13,6 +13,7 @@ class Combination:
     source: str
     provider: str
     model: str
+    detail: str = "standard"
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,8 @@ def plan_output_path(
     if not plain.exists():
         return OutputPlan(plain)
     label = combo.source if kind == "transcript" else f"{combo.source} · {combo.provider}-{combo.model}"
+    if kind != "transcript" and combo.detail != "standard":
+        label += f" · {combo.detail}"
     stem = f"{base} [{label}]"
     if (out_dir / f"{stem}{suffix}").exists():
         stem = f"{stem} ({combo.video_id})"
@@ -72,6 +75,7 @@ def _read_combination(path: Path) -> Combination | None:
             fields["transcript_source"],
             fields["provider"],
             fields["model"],
+            fields.get("detail", "standard"),  # notes from before detail levels were standard
         )
     except KeyError:
         return None

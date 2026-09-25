@@ -3,7 +3,9 @@ import json
 from yt_summariser.transcript.models import VideoInfo
 
 
-def render_note(info: VideoInfo, source: str, provider: str, model: str, body: str) -> str:
+def render_note(
+    info: VideoInfo, source: str, provider: str, model: str, body: str, detail: str | None = None
+) -> str:
     frontmatter = [
         "---",
         f"title: {json.dumps(info.title)}",
@@ -16,6 +18,7 @@ def render_note(info: VideoInfo, source: str, provider: str, model: str, body: s
         f"transcript_source: {source}",
         f"provider: {provider}",
         f"model: {model}",
+        *([f"detail: {detail}"] if detail else []),
         "---",
     ]
     return "\n".join(frontmatter) + f"\n\n# {info.title}\n\n[Watch on YouTube]({info.url})\n\n{body.strip()}\n"
