@@ -60,3 +60,27 @@ def test_openai_uses_documented_default_model():
     provider = make_provider("openai", model=None, env={"OPENAI_API_KEY": "k"})
 
     assert provider.model == "gpt-6-luna"
+
+
+def test_ollama_requests_turn_thinking_off():
+    from fake_server import FakeServer
+
+    reply = {"choices": [{"message": {"content": "ok"}}]}
+    with FakeServer([(200, reply)]) as server:
+        provider = make_provider("ollama", model="gemma4:12b", env={}, base_url=server.url)
+
+        provider.complete(system="s", prompt="p")
+
+    assert server.requests[0]["body"]["reasoning_effort"] == "none"
+
+
+def test_openai_requests_do_not_send_reasoning_settings():
+    from fake_server import FakeServer
+
+    reply = {"choices": [{"message": {"content": "ok"}}]}
+    with FakeServer([(200, reply)]) as server:
+        provider = make_provider("openai", model=None, env={"OPENAI_API_KEY": "k"}, base_url=server.url)
+
+        provider.complete(system="s", prompt="p")
+
+    assert "reasoning_effort" not in server.requests[0]["body"]

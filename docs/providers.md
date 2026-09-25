@@ -53,6 +53,9 @@ Without a model:
 error: --model is required for --provider ollama (e.g. --model llama3).
 ```
 
+Thinking is turned off for Ollama requests (`reasoning_effort: none`): summarising doesn't need it, and on
+thinking models such as `gemma4:12b` it made runs about 6x slower.
+
 Local models have small context windows. Transcripts over 6,000 estimated tokens are chunked
 automatically; raise or lower that with `--max-context-tokens`.
 

@@ -8,6 +8,8 @@ DEFAULT_CLAUDE_MODEL = "claude-sonnet-5"
 DEFAULT_OPENAI_MODEL = "gpt-6-luna"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
+# Summarising does not need reasoning; on thinking models it made runs ~6x slower.
+OLLAMA_NO_THINKING = {"reasoning_effort": "none"}
 
 
 def _require(env: Mapping[str, str], name: str, provider: str) -> str:
@@ -32,5 +34,7 @@ def make_provider(name: str, model: str | None, env: Mapping[str, str], base_url
         if not model:
             raise ProviderError("--model is required for --provider ollama (e.g. --model llama3).")
         host = env.get("OLLAMA_HOST", DEFAULT_OLLAMA_HOST).rstrip("/")
-        return OpenAICompatibleProvider(base_url or f"{host}/v1", None, model)
+        return OpenAICompatibleProvider(
+            base_url or f"{host}/v1", None, model, extra_body=OLLAMA_NO_THINKING
+        )
     raise ProviderError(f"Unknown provider: {name}")
