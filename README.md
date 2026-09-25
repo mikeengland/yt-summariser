@@ -38,6 +38,35 @@ The command is available as `yts` and `yt-summariser`. Run `yts --help` for all 
 | `--max-context-tokens N` | Chunk transcripts longer than this before summarising. |
 | `--cookies-from-browser B` | Pass browser cookies to yt-dlp for restricted videos. |
 
+## Ollama: set its context window
+
+The tool assumes a **16k-token context window** for Ollama and sends transcripts of up to
+12,000 estimated tokens in one request (longer ones are split, summarised in chunks and merged).
+Ollama itself defaults to a **4096-token** window and the tool cannot change that for you, so raise it
+when you start Ollama:
+
+```console
+# Terminal: quit the Ollama menu-bar app first, then
+OLLAMA_CONTEXT_LENGTH=16384 ollama serve
+
+# macOS menu-bar app: set it for the app, then restart the app
+launchctl setenv OLLAMA_CONTEXT_LENGTH 16384
+```
+
+Check it took effect with `ollama ps` (the `CONTEXT` column should say `16384`). A 12B model such as
+`gemma4:12b` used about 8.4 GB at 16k on a 16 GB Mac.
+
+If you would rather keep Ollama's defaults or use a different window, tell the tool with
+`--max-context-tokens`, keeping it at roughly 75% of the window:
+
+```console
+yts URL -o vault --provider ollama --model llama3.2 --max-context-tokens 2500   # default 4096 window
+yts URL -o vault --provider ollama --model gemma4:12b --max-context-tokens 24000 # 32k window
+```
+
+If the window is too small you get `The model's response was cut off ...`: lower
+`--max-context-tokens` or raise Ollama's window. More detail in [docs/providers.md](docs/providers.md).
+
 ## What you get
 
 A note named after the video title, with YAML frontmatter (`title`, `url`, `video_id`, `channel`,

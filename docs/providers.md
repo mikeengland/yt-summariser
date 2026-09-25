@@ -59,22 +59,26 @@ thinking models such as `gemma4:12b` it made runs about 6x slower.
 ### Context windows and long videos
 
 Ollama's default context window is **4096 tokens**, even though models like `gemma4:12b` support far
-more. Prompt and answer must both fit, so by default the tool splits Ollama transcripts into chunks of
-about 2,500 tokens (map), condenses the chunk notes in groups that each fit the budget until the
-combined notes fit (reduce), and then writes the final summary from those notes. This works everywhere
-but is slower and gives less specific results than one request over the whole transcript.
+more, and its OpenAI-compatible endpoint (which this tool uses) ignores per-request window settings
+(checked with Ollama 0.34). So the window has to be set on the server, and the tool's budget has to
+match it.
 
-If your machine has the memory, raise Ollama's window and tell the tool to use it. Measured on a
-16 GB M1 Pro with `gemma4:12b` (8.4 GB loaded at 16k context), a 21-minute video went from 3m22s
-chunked to 2m29s as one request, with better timestamp coverage:
+The tool's default Ollama budget is **12,000 estimated tokens**, which assumes a 16k window. Transcripts
+within the budget go in as one request. Longer ones are split into chunks (map), the chunk notes are
+condensed in groups that each fit the budget until they fit (reduce), and the final summary is written
+from those notes.
 
 ```console
 OLLAMA_CONTEXT_LENGTH=16384 ollama serve      # quit the menu-bar app first
-yts URL -o vault --provider ollama --model gemma4:12b --max-context-tokens 12000
+yts URL -o vault --provider ollama --model gemma4:12b
 ```
 
-Keep `--max-context-tokens` comfortably below the window (about 75%) to leave room for the prompt and
-the answer. If a response is cut off, the tool stops with an error telling you to lower it.
+Measured on a 16 GB M1 Pro with `gemma4:12b` (8.4 GB loaded at 16k context), a 21-minute video took
+2m29s as one request versus 3m22s chunked at the old 2,500-token budget, with better timestamp coverage.
+
+To use a different window, pass `--max-context-tokens` at about 75% of it (2500 for the default 4096
+window, 24000 for 32k). If the window is smaller than the budget, the model's response is cut off and
+the tool stops with an error telling you to lower `--max-context-tokens` or raise Ollama's window.
 
 ## Retries
 

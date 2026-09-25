@@ -297,10 +297,25 @@ def test_reduction_gives_up_rather_than_looping_when_notes_cannot_be_combined(tm
     assert len(server.requests) == 4  # 3 chunk notes + the final merge, nothing in between
 
 
-def test_ollama_default_budget_fits_its_default_4096_token_window(tmp_path):
+def test_ollama_default_budget_assumes_a_16k_window_so_medium_transcripts_go_in_one_request(tmp_path):
     from yt_summariser.transcript.models import Segment
 
     captions = [Segment(i * 60.0, "word " * 80) for i in range(30)]  # about 3,000 tokens
+    with FakeServer([(200, GOOD_REPLY)]) as server:
+        invoke(
+            [INFO.url, "-o", str(tmp_path / "vault")],
+            server.url,
+            youtube=FakeYouTube(manual=captions),
+            cache_dir=tmp_path / "c",
+        )
+
+    assert len(server.requests) == 1
+
+
+def test_ollama_default_budget_still_chunks_transcripts_beyond_a_16k_window(tmp_path):
+    from yt_summariser.transcript.models import Segment
+
+    captions = [Segment(i * 60.0, "word " * 80) for i in range(130)]  # about 13,000 tokens
     with FakeServer([reply("a"), reply("b"), (200, GOOD_REPLY)]) as server:
         invoke(
             [INFO.url, "-o", str(tmp_path / "vault")],
@@ -309,4 +324,4 @@ def test_ollama_default_budget_fits_its_default_4096_token_window(tmp_path):
             cache_dir=tmp_path / "c",
         )
 
-    assert len(server.requests) == 3  # 2 chunks + merge, instead of one 3,000-token request
+    assert len(server.requests) == 3  # 2 chunks + merge

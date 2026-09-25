@@ -18,7 +18,7 @@ from yt_summariser.transcript.youtube import YtDlpYouTube
 from yt_summariser.transcript.selection import TranscriptError, get_transcript
 
 
-DEFAULT_CONTEXT_BUDGET = {"claude": 150_000, "openai": 100_000, "ollama": 2_500}
+DEFAULT_CONTEXT_BUDGET = {"claude": 150_000, "openai": 100_000, "ollama": 12_000}
 
 
 class ToolError(Exception):
@@ -41,6 +41,8 @@ providers (choose one with --provider; there is no default):
            to use any OpenAI-compatible server.
   ollama   needs no key, but --model is required (e.g. --model llama3). Endpoint is
            http://localhost:11434/v1; override with OLLAMA_HOST or --base-url.
+           Assumes a 16k context window (start Ollama with OLLAMA_CONTEXT_LENGTH=16384);
+           for its default 4096 window pass --max-context-tokens 2500.
 
 examples:
   yts URL -o ~/Vault/YouTube --provider claude
