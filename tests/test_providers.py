@@ -85,3 +85,22 @@ def test_client_errors_are_not_retried():
             provider.complete(system="s", prompt="p")
 
     assert len(server.requests) == 1
+
+
+def test_response_cut_off_by_the_context_window_is_a_clear_error():
+    import pytest
+
+    from yt_summariser.providers.http import ProviderError
+
+    cut_off = {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]}
+    with FakeServer([(200, cut_off)]) as server:
+        provider = OpenAICompatibleProvider(server.url, "k", "m", sleep=lambda s: None)
+
+        with pytest.raises(ProviderError) as error:
+            provider.complete(system="s", prompt="p")
+
+    assert str(error.value) == (
+        "The model's response was cut off because the prompt and answer did not fit its context "
+        "window. Lower --max-context-tokens. For Ollama, also raise its window, "
+        "e.g. OLLAMA_CONTEXT_LENGTH=16384 ollama serve (the default is 4096)."
+    )

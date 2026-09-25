@@ -247,3 +247,66 @@ def test_provider_is_required_for_summaries(tmp_path):
     assert code == 1
     assert "--provider is required" in stderr
     assert "claude, openai or ollama" in stderr
+
+
+def note(label):
+    return reply(label + "x" * 490)  # about 123 tokens
+
+
+def test_chunk_notes_too_big_for_the_window_are_reduced_in_groups_before_the_final_merge(tmp_path):
+    from yt_summariser.summarise.chunking import estimate_tokens
+    from yt_summariser.transcript.models import Segment
+
+    captions = [Segment(i * 60.0, "word " * 80) for i in range(6)]  # 3 chunks at budget 250
+    responses = [
+        note("n1"), note("n2"), note("n3"),  # map: 3 x 123 tokens = 369 > 250, so reduce first
+        reply("r1"), reply("r2"),            # reduce: [n1, n2] and [n3]
+        (200, GOOD_REPLY),                   # final merge of [r1, r2]
+    ]
+    with FakeServer(responses) as server:
+        code, _, _ = invoke(
+            [INFO.url, "-o", str(tmp_path / "vault"), "--max-context-tokens", "250"],
+            server.url,
+            youtube=FakeYouTube(manual=captions),
+            cache_dir=tmp_path / "c",
+        )
+
+    prompts = [r["body"]["messages"][1]["content"] for r in server.requests]
+    assert code == 0
+    assert len(prompts) == 6
+    assert "n1" in prompts[3] and "n2" in prompts[3] and "n3" not in prompts[3]
+    assert "n3" in prompts[4]
+    assert "r1" in prompts[5] and "r2" in prompts[5] and "n1" not in prompts[5]
+    assert all(estimate_tokens(p) <= 250 for p in prompts)
+
+
+def test_reduction_gives_up_rather_than_looping_when_notes_cannot_be_combined(tmp_path):
+    from yt_summariser.transcript.models import Segment
+
+    captions = [Segment(i * 60.0, "word " * 80) for i in range(6)]
+    huge = reply("y" * 1400)  # each note alone is bigger than the whole budget
+    with FakeServer([huge, huge, huge, (200, GOOD_REPLY)]) as server:
+        code, _, _ = invoke(
+            [INFO.url, "-o", str(tmp_path / "vault"), "--max-context-tokens", "250"],
+            server.url,
+            youtube=FakeYouTube(manual=captions),
+            cache_dir=tmp_path / "c",
+        )
+
+    assert code == 0
+    assert len(server.requests) == 4  # 3 chunk notes + the final merge, nothing in between
+
+
+def test_ollama_default_budget_fits_its_default_4096_token_window(tmp_path):
+    from yt_summariser.transcript.models import Segment
+
+    captions = [Segment(i * 60.0, "word " * 80) for i in range(30)]  # about 3,000 tokens
+    with FakeServer([reply("a"), reply("b"), (200, GOOD_REPLY)]) as server:
+        invoke(
+            [INFO.url, "-o", str(tmp_path / "vault")],
+            server.url,
+            youtube=FakeYouTube(manual=captions),
+            cache_dir=tmp_path / "c",
+        )
+
+    assert len(server.requests) == 3  # 2 chunks + merge, instead of one 3,000-token request

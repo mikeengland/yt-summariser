@@ -56,8 +56,25 @@ error: --model is required for --provider ollama (e.g. --model llama3).
 Thinking is turned off for Ollama requests (`reasoning_effort: none`): summarising doesn't need it, and on
 thinking models such as `gemma4:12b` it made runs about 6x slower.
 
-Local models have small context windows. Transcripts over 6,000 estimated tokens are chunked
-automatically; raise or lower that with `--max-context-tokens`.
+### Context windows and long videos
+
+Ollama's default context window is **4096 tokens**, even though models like `gemma4:12b` support far
+more. Prompt and answer must both fit, so by default the tool splits Ollama transcripts into chunks of
+about 2,500 tokens (map), condenses the chunk notes in groups that each fit the budget until the
+combined notes fit (reduce), and then writes the final summary from those notes. This works everywhere
+but is slower and gives less specific results than one request over the whole transcript.
+
+If your machine has the memory, raise Ollama's window and tell the tool to use it. Measured on a
+16 GB M1 Pro with `gemma4:12b` (8.4 GB loaded at 16k context), a 21-minute video went from 3m22s
+chunked to 2m29s as one request, with better timestamp coverage:
+
+```console
+OLLAMA_CONTEXT_LENGTH=16384 ollama serve      # quit the menu-bar app first
+yts URL -o vault --provider ollama --model gemma4:12b --max-context-tokens 12000
+```
+
+Keep `--max-context-tokens` comfortably below the window (about 75%) to leave room for the prompt and
+the answer. If a response is cut off, the tool stops with an error telling you to lower it.
 
 ## Retries
 

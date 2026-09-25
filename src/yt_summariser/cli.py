@@ -18,7 +18,7 @@ from yt_summariser.transcript.youtube import YtDlpYouTube
 from yt_summariser.transcript.selection import TranscriptError, get_transcript
 
 
-DEFAULT_CONTEXT_BUDGET = {"claude": 150_000, "openai": 100_000, "ollama": 6_000}
+DEFAULT_CONTEXT_BUDGET = {"claude": 150_000, "openai": 100_000, "ollama": 2_500}
 
 
 class ToolError(Exception):

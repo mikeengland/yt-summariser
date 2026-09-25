@@ -1,7 +1,13 @@
 import time
 from collections.abc import Callable
 
-from yt_summariser.providers.http import post_json
+from yt_summariser.providers.http import ProviderError, post_json
+
+CUT_OFF_MESSAGE = (
+    "The model's response was cut off because the prompt and answer did not fit its context "
+    "window. Lower --max-context-tokens. For Ollama, also raise its window, "
+    "e.g. OLLAMA_CONTEXT_LENGTH=16384 ollama serve (the default is 4096)."
+)
 
 
 class OpenAICompatibleProvider:
@@ -34,4 +40,7 @@ class OpenAICompatibleProvider:
             },
             self.sleep,
         )
-        return reply["choices"][0]["message"]["content"]
+        choice = reply["choices"][0]
+        if choice.get("finish_reason") == "length":
+            raise ProviderError(CUT_OFF_MESSAGE)
+        return choice["message"]["content"]
